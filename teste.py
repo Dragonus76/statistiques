@@ -1,5 +1,6 @@
 import json
 import math
+import matplotlib.pyplot as plt
 
 class Agent:
 
@@ -31,6 +32,9 @@ class Zone:
      MAX_LATITUDE_DEGREES = 90
      WIDTH_DEGREES = 1 # degrees of longitude
      HEIGHT_DEGREES = 1 # degrees of latitude
+     EARTH_RADIUS_KILOMETERS = 6371
+
+
      def __init__(self, corner1, corner2):
         self.corner1 = corner1
         self.corner2 = corner2
@@ -39,13 +43,49 @@ class Zone:
      def population(self):
         """Number of inhabitants in the zone"""
         return len(self.inhabitants)
+
+
+     @property
+     def width(self):
+        return abs(self.corner1.longitude - self.corner2.longitude) * self.EARTH_RADIUS_KILOMETERS
+
+     @property
+     def height(self):
+        return abs(self.corner1.latitude- self.corner2.latitude) * self.EARTH_RADIUS_KILOMETERS
+           
+
+     @property
+     def area(self):
+        """Compute the zone area, in square kilometers"""
+        return self.height * self.width
+
+     def population_density(self):
+        """population density of the zone, (people/km²)"""
+        # Note  that this will crasch with a ZeroDivisionError if the zone has 0
+        # area, but it should really not happen 
+        return self.population / self.area
+
+
      def add_inhabitant(self, inhabitant):
         self.inhabitants.append(inhabitant)
+
+
+
+     def average_agreeableness(self):
+        if not self.inhabitants:
+            return 0
+        return sum([inhabitant.agreeableness for inhabitant in self.inhabitants]) / self.population  
+
+
+       
+
      def contains(self, position):
+
         return position.longitude >= min(self.corner1.longitude, self.corner2.longitude) and \
             position.longitude < max(self.corner1.longitude, self.corner2.longitude) and \
             position.latitude >= min(self.corner1.latitude, self.corner2.latitude) and \
             position.latitude < max(self.corner1.latitude, self.corner2.latitude)
+
      @classmethod
      def find_zone_that_contains(cls, position):
         if not cls.ZONES:
@@ -70,17 +110,71 @@ class Zone:
                 top_right_corner = Position(longitude + cls.WIDTH_DEGREES, latitude + cls.HEIGHT_DEGREES)
                 zone = Zone(bottom_left_corner, top_right_corner)
                 cls.ZONES.append(zone)
+
+
+class BaseGraph:
+
+    def __init__(self):
+        self.title = "Your graph title"
+        self.x_label = "X-axis label"
+        self.y_label = "x-axis label"
+        self.show_grid = True
+
+    def show(self, zones):
+    # x_values = gather only x_values from zones
+    # y_values = gather only y_values from zones
+        x_values, y_values = self.xy_values(zones)
+        plt.plot(x_values, y_values, ".")
+        plt.xlabel(self.x_label)
+        plt.ylabel(self.y_label)
+        plt.title(self.title)
+        plt.grid(self.show_grid)
+        plt.show()
+
+
+
+    def xy_values(self, zones):
+        raise NotImplementedError
+
+
+class AgreeablenessGraph(BaseGraph):
+
+
+
+    def __init__(self):
+        super().__init__()
+        self.title = "Nice people live in the countryside"
+        self.x_label = "population density"
+        self.y_label = "agreeableness"
+
+    def xy_values(self,zones):
+        x_values = [zone.population_density() for zone in zones]
+        y_values = [zone.average_agreeableness() for zone in zones]
+        return x_values, y_values
+
+
+
+
+
+
+
+
+
+
+
 def main():
     for agent_attributes in json.load(open("agents-100k.json")):
         latitude = agent_attributes.pop("latitude")
         longitude = agent_attributes.pop("longitude")
-        position = Position(latitude, longitude)
         position = Position(longitude, latitude)
         agent = Agent(position, **agent_attributes)
-        print(agent.position.longitude)
-        print(agent.position.latitude)
         zone = Zone.find_zone_that_contains(position)
         zone.add_inhabitant(agent)
-        # print(zone.population)
+    
+    agreeableness_graph = AgreeablenessGraph()
+    agreeableness_graph.show(Zone.ZONES)
 
 main()
+
+
+
